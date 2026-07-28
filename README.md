@@ -19,6 +19,7 @@
 - [x] 練習題與測驗（含批改邏輯）——目前為依課程單字自動出的選擇題測驗
 - [x] 使用者學習進度追蹤——目前為每次測驗的分數歷程，之後可再擴充（例如間隔重複）
 - [x] 提供給前端 / App 的 REST API
+- [x] 角色 / 權限分級——`TEACHER` 管理課程與單字內容，`STUDENT` 唯讀並可測驗
 
 ## 專案結構
 
@@ -28,11 +29,11 @@ src/
     java/
       com/languagelearning/
         controller/   # REST API 入口（HealthController、AuthController、CourseController、WordController、QuizController）
-        config/       # 設定（SecurityConfig）
+        config/       # 設定（SecurityConfig、OpenApiConfig）
         security/     # JwtService、JwtAuthFilter
         service/      # 商業邏輯（AuthService、CourseService、WordService、QuizService）
         repository/   # 資料存取層（UserRepository、CourseRepository、WordRepository、QuizAttemptRepository）
-        model/        # 實體類別 Entity（User、Course、Word、QuizAttempt）
+        model/        # 實體類別 Entity（User、Role、Course、Word、QuizAttempt）
         dto/          # 資料傳輸物件（Auth、Course、Word、Quiz 相關 DTO）
     resources/
       application.properties
@@ -61,27 +62,31 @@ docker compose up -d
 
 資料庫連線參數可用環境變數覆蓋：`DB_NAME`、`DB_USERNAME`、`DB_PASSWORD`（預設對應 `docker-compose.yml` 裡的設定）。
 
+> 注意：`users` 表新增了 `NOT NULL` 的 `role` 欄位。若本機 Postgres 裡已經有舊資料（沒有 role 值），`spring.jpa.hibernate.ddl-auto=update` 會因為 NOT NULL 限制而啟動失敗，執行 `docker compose down -v` 清空本機資料庫重來即可（開發資料，沒有保留必要）。
+
 ## API
 
-| Method | Path                          | 說明                              | 需要 JWT |
-|--------|-------------------------------|-----------------------------------|----------|
-| GET    | `/api/health`                 | 健康檢查                          | 否       |
-| POST   | `/api/auth/register`          | 註冊，成功回傳 `{ "token": ... }` | 否       |
-| POST   | `/api/auth/login`             | 登入，成功回傳 `{ "token": ... }` | 否       |
-| GET    | `/api/auth/me`                | 回傳目前登入使用者的 email        | 是       |
-| POST   | `/api/courses`                | 新增課程                          | 是       |
-| GET    | `/api/courses`                | 取得課程列表                      | 是       |
-| GET    | `/api/courses/{id}`           | 取得單一課程                      | 是       |
-| PUT    | `/api/courses/{id}`           | 更新課程                          | 是       |
-| DELETE | `/api/courses/{id}`           | 刪除課程                          | 是       |
-| POST   | `/api/courses/{courseId}/words` | 在指定課程下新增單字             | 是       |
-| GET    | `/api/courses/{courseId}/words` | 取得指定課程下的單字列表         | 是       |
-| GET    | `/api/words/{id}`             | 取得單一單字                      | 是       |
-| PUT    | `/api/words/{id}`             | 更新單字                          | 是       |
-| DELETE | `/api/words/{id}`             | 刪除單字                          | 是       |
-| GET    | `/api/courses/{courseId}/quiz` | 依課程單字隨機出選擇題（`?size=`，預設 5，最少需課程內有 2 個單字） | 是       |
-| POST   | `/api/courses/{courseId}/quiz/submit` | 提交作答並批改，回傳分數與每題對錯明細，同時記錄一筆測驗紀錄 | 是       |
-| GET    | `/api/courses/{courseId}/progress` | 取得目前使用者在此課程的歷次測驗分數（新到舊）        | 是       |
+| Method | Path                          | 說明                              | 需要 JWT | 需要角色 |
+|--------|-------------------------------|-----------------------------------|----------|----------|
+| GET    | `/api/health`                 | 健康檢查                          | 否       | -        |
+| POST   | `/api/auth/register`          | 註冊，成功回傳 `{ "token": ... }` | 否       | -        |
+| POST   | `/api/auth/login`             | 登入，成功回傳 `{ "token": ... }` | 否       | -        |
+| GET    | `/api/auth/me`                | 回傳目前登入使用者的 email 與角色 | 是       | 任一     |
+| POST   | `/api/courses`                | 新增課程                          | 是       | `TEACHER` |
+| GET    | `/api/courses`                | 取得課程列表                      | 是       | 任一     |
+| GET    | `/api/courses/{id}`           | 取得單一課程                      | 是       | 任一     |
+| PUT    | `/api/courses/{id}`           | 更新課程                          | 是       | `TEACHER` |
+| DELETE | `/api/courses/{id}`           | 刪除課程                          | 是       | `TEACHER` |
+| POST   | `/api/courses/{courseId}/words` | 在指定課程下新增單字             | 是       | `TEACHER` |
+| GET    | `/api/courses/{courseId}/words` | 取得指定課程下的單字列表         | 是       | 任一     |
+| GET    | `/api/words/{id}`             | 取得單一單字                      | 是       | 任一     |
+| PUT    | `/api/words/{id}`             | 更新單字                          | 是       | `TEACHER` |
+| DELETE | `/api/words/{id}`             | 刪除單字                          | 是       | `TEACHER` |
+| GET    | `/api/courses/{courseId}/quiz` | 依課程單字隨機出選擇題（`?size=`，預設 5，最少需課程內有 2 個單字） | 是       | 任一     |
+| POST   | `/api/courses/{courseId}/quiz/submit` | 提交作答並批改，回傳分數與每題對錯明細，同時記錄一筆測驗紀錄 | 是       | 任一     |
+| GET    | `/api/courses/{courseId}/progress` | 取得目前使用者在此課程的歷次測驗分數（新到舊）        | 是       | 任一     |
+
+註冊請求格式（`RegisterRequest`）：`{ "email": string (必填), "password": string (必填，至少 8 碼), "role": "TEACHER" | "STUDENT" (可省略，預設 STUDENT) }`
 
 課程請求格式（`CourseRequest`）：`{ "title": string (必填), "description": string }`
 
@@ -94,7 +99,7 @@ docker compose up -d
 ```bash
 curl -X POST http://localhost:8080/api/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"email":"demo@example.com","password":"password123"}'
+  -d '{"email":"teacher@example.com","password":"password123","role":"TEACHER"}'
 
 curl http://localhost:8080/api/auth/me \
   -H "Authorization: Bearer <上面拿到的 token>"
@@ -104,12 +109,18 @@ curl http://localhost:8080/api/auth/me \
 
 - 密碼以 BCrypt 雜湊儲存，JWT 用 HMAC-SHA256 簽章（`JwtService`），有效期預設 24 小時（`jwt.expiration-ms`）。
 - `jwt.secret` 目前有內建的開發用預設值，正式環境務必用 `JWT_SECRET` 環境變數覆蓋。
-- 除了 `/api/health`、`/api/auth/register`、`/api/auth/login` 外，其餘 API 都需要帶有效 JWT（`SecurityConfig` 的 `anyRequest().authenticated()`）。
-- 目前沒有角色 / 權限分級（單一使用者類型），需要的話之後再加。
+- 除了 `/api/health`、`/api/auth/register`、`/api/auth/login`、`/v3/api-docs/**`、`/swagger-ui/**` 外，其餘 API 都需要帶有效 JWT（`SecurityConfig` 的 `anyRequest().authenticated()`）。
+- 角色分為 `TEACHER`（可管理課程/單字內容）與 `STUDENT`（唯讀 + 測驗），在 `SecurityConfig` 用 HTTP method + path 規則搭配 `hasAuthority("ROLE_TEACHER")` 控管，角色由 `JwtAuthFilter` 每次請求即時從資料庫讀取（不寫進 JWT payload，角色異動不用等舊 token 過期）。
+- 角色目前由使用者註冊時自行選擇（`RegisterRequest.role`，省略則預設 `STUDENT`），沒有審核或邀請碼機制，任何人都能自行註冊為 `TEACHER`——之後要防濫用需另外設計審核流程。
 
 ## API 文件
 
-尚未加入 Springdoc OpenAPI：最新版（2.8.6）目前還不相容 Spring Boot 4.1.0，等相容版本釋出後再補上 `springdoc-openapi-starter-webmvc-ui` 依賴。
+已加入 `springdoc-openapi-starter-webmvc-ui`（2.8.6，實測與 Spring Boot 4.1.0 相容）：
+
+- Swagger UI：`http://localhost:8080/swagger-ui/index.html`
+- OpenAPI JSON：`http://localhost:8080/v3/api-docs`
+
+這兩個端點皆對外公開（免登入），JWT 保護的端點可在 Swagger UI 右上角 Authorize 貼上 `Bearer <token>` 後直接測試。
 
 ## 開發規範
 

@@ -4,6 +4,7 @@ import com.languagelearning.security.JwtAuthFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -45,7 +46,14 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/error", "/api/health", "/api/auth/register", "/api/auth/login").permitAll()
+                .requestMatchers("/error", "/api/health", "/api/auth/register", "/api/auth/login",
+                    "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/courses").hasAuthority("ROLE_TEACHER")
+                .requestMatchers(HttpMethod.PUT, "/api/courses/*").hasAuthority("ROLE_TEACHER")
+                .requestMatchers(HttpMethod.DELETE, "/api/courses/*").hasAuthority("ROLE_TEACHER")
+                .requestMatchers(HttpMethod.POST, "/api/courses/*/words").hasAuthority("ROLE_TEACHER")
+                .requestMatchers(HttpMethod.PUT, "/api/words/*").hasAuthority("ROLE_TEACHER")
+                .requestMatchers(HttpMethod.DELETE, "/api/words/*").hasAuthority("ROLE_TEACHER")
                 .anyRequest().authenticated())
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();

@@ -2,6 +2,7 @@ package com.languagelearning.service;
 
 import com.languagelearning.dto.LoginRequest;
 import com.languagelearning.dto.RegisterRequest;
+import com.languagelearning.model.Role;
 import com.languagelearning.model.User;
 import com.languagelearning.repository.UserRepository;
 import com.languagelearning.security.JwtService;
@@ -27,7 +28,8 @@ public class AuthService {
         if (userRepository.existsByEmail(request.email())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already registered");
         }
-        User user = new User(request.email(), passwordEncoder.encode(request.password()));
+        Role role = request.role() != null ? request.role() : Role.STUDENT;
+        User user = new User(request.email(), passwordEncoder.encode(request.password()), role);
         userRepository.save(user);
         return jwtService.generateToken(user.getEmail());
     }

@@ -39,6 +39,6 @@ public class AuthController {
 
     @GetMapping("/me")
     public Map<String, String> me(@AuthenticationPrincipal User user) {
-        return Map.of("email", user.getEmail());
+        return Map.of("email", user.getEmail(), "role", user.getRole().name());
     }
 }

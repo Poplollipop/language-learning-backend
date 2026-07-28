@@ -25,7 +25,7 @@ class CourseWordControllerTest {
         String body = mockMvc.perform(post("/api/auth/register")
                 .contentType("application/json")
                 .content("""
-                    {"email":"teacher@example.com","password":"password123"}"""))
+                    {"email":"teacher@example.com","password":"password123","role":"TEACHER"}"""))
             .andReturn().getResponse().getContentAsString();
         return JsonPath.read(body, "$.token");
     }

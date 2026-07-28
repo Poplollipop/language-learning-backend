@@ -28,7 +28,7 @@ class QuizControllerTest {
         String email = "quiz-" + UUID.randomUUID() + "@example.com";
         String body = mockMvc.perform(post("/api/auth/register")
                 .contentType("application/json")
-                .content("{\"email\":\"" + email + "\",\"password\":\"password123\"}"))
+                .content("{\"email\":\"" + email + "\",\"password\":\"password123\",\"role\":\"TEACHER\"}"))
             .andReturn().getResponse().getContentAsString();
         return "Bearer " + JsonPath.<String>read(body, "$.token");
     }
