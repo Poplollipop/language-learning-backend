@@ -14,11 +14,11 @@
 
 ## 功能規劃
 
-- 使用者註冊 / 登入 / 身份驗證
-- 課程與單字內容管理
-- 練習題與測驗（含批改邏輯）
-- 使用者學習進度追蹤
-- 提供給前端 / App 的 REST API
+- [x] 使用者註冊 / 登入 / 身份驗證
+- [x] 課程與單字內容管理
+- [x] 練習題與測驗（含批改邏輯）——目前為依課程單字自動出的選擇題測驗
+- [x] 使用者學習進度追蹤——目前為每次測驗的分數歷程，之後可再擴充（例如間隔重複）
+- [x] 提供給前端 / App 的 REST API
 
 ## 專案結構
 
@@ -27,13 +27,13 @@ src/
   main/
     java/
       com/languagelearning/
-        controller/   # REST API 入口（HealthController、AuthController）
+        controller/   # REST API 入口（HealthController、AuthController、CourseController、WordController、QuizController）
         config/       # 設定（SecurityConfig）
         security/     # JwtService、JwtAuthFilter
-        service/      # 商業邏輯（AuthService）
-        repository/   # 資料存取層（UserRepository）
-        model/        # 實體類別 Entity（User）
-        dto/          # 資料傳輸物件（尚未建立課程/單字相關的，加功能時再開）
+        service/      # 商業邏輯（AuthService、CourseService、WordService、QuizService）
+        repository/   # 資料存取層（UserRepository、CourseRepository、WordRepository、QuizAttemptRepository）
+        model/        # 實體類別 Entity（User、Course、Word、QuizAttempt）
+        dto/          # 資料傳輸物件（Auth、Course、Word、Quiz 相關 DTO）
     resources/
       application.properties
   test/
@@ -63,12 +63,31 @@ docker compose up -d
 
 ## API
 
-| Method | Path                | 說明                          | 需要 JWT |
-|--------|---------------------|-------------------------------|----------|
-| GET    | `/api/health`        | 健康檢查                      | 否       |
-| POST   | `/api/auth/register`| 註冊，成功回傳 `{ "token": ... }` | 否       |
-| POST   | `/api/auth/login`   | 登入，成功回傳 `{ "token": ... }` | 否       |
-| GET    | `/api/auth/me`      | 回傳目前登入使用者的 email    | 是       |
+| Method | Path                          | 說明                              | 需要 JWT |
+|--------|-------------------------------|-----------------------------------|----------|
+| GET    | `/api/health`                 | 健康檢查                          | 否       |
+| POST   | `/api/auth/register`          | 註冊，成功回傳 `{ "token": ... }` | 否       |
+| POST   | `/api/auth/login`             | 登入，成功回傳 `{ "token": ... }` | 否       |
+| GET    | `/api/auth/me`                | 回傳目前登入使用者的 email        | 是       |
+| POST   | `/api/courses`                | 新增課程                          | 是       |
+| GET    | `/api/courses`                | 取得課程列表                      | 是       |
+| GET    | `/api/courses/{id}`           | 取得單一課程                      | 是       |
+| PUT    | `/api/courses/{id}`           | 更新課程                          | 是       |
+| DELETE | `/api/courses/{id}`           | 刪除課程                          | 是       |
+| POST   | `/api/courses/{courseId}/words` | 在指定課程下新增單字             | 是       |
+| GET    | `/api/courses/{courseId}/words` | 取得指定課程下的單字列表         | 是       |
+| GET    | `/api/words/{id}`             | 取得單一單字                      | 是       |
+| PUT    | `/api/words/{id}`             | 更新單字                          | 是       |
+| DELETE | `/api/words/{id}`             | 刪除單字                          | 是       |
+| GET    | `/api/courses/{courseId}/quiz` | 依課程單字隨機出選擇題（`?size=`，預設 5，最少需課程內有 2 個單字） | 是       |
+| POST   | `/api/courses/{courseId}/quiz/submit` | 提交作答並批改，回傳分數與每題對錯明細，同時記錄一筆測驗紀錄 | 是       |
+| GET    | `/api/courses/{courseId}/progress` | 取得目前使用者在此課程的歷次測驗分數（新到舊）        | 是       |
+
+課程請求格式（`CourseRequest`）：`{ "title": string (必填), "description": string }`
+
+單字請求格式（`WordRequest`）：`{ "term": string (必填), "meaning": string (必填), "example": string }`
+
+測驗作答格式（`QuizSubmissionRequest`）：`{ "answers": [{ "wordId": number, "selectedMeaning": string }] }`，`selectedMeaning` 需與出題時 `GET .../quiz` 回傳的選項之一相符（比對時忽略大小寫與前後空白）。
 
 呼叫需要 JWT 的端點時，帶上 `Authorization: Bearer <token>`。
 
@@ -96,7 +115,3 @@ curl http://localhost:8080/api/auth/me \
 
 - 分支策略：`main` 為穩定分支，功能開發於 `feature/*` 分支
 - Commit 訊息使用清楚的動詞開頭（例如 `Add`、`Fix`、`Update`）
-
-## License
-
-TBD
