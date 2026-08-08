@@ -63,8 +63,6 @@ docker compose up -d
 
 資料庫連線參數可用環境變數覆蓋：`DB_NAME`、`DB_USERNAME`、`DB_PASSWORD`（預設對應 `docker-compose.yml` 裡的設定）。
 
-> 注意：`users` 表新增了 `NOT NULL` 的 `role` 欄位。若本機 Postgres 裡已經有舊資料（沒有 role 值），`spring.jpa.hibernate.ddl-auto=update` 會因為 NOT NULL 限制而啟動失敗，執行 `docker compose down -v` 清空本機資料庫重來即可（開發資料，沒有保留必要）。
-
 ## API
 
 | Method | Path                          | 說明                              | 需要 JWT | 需要角色 |
