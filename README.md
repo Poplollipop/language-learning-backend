@@ -17,7 +17,7 @@
 - [x] 使用者註冊 / 登入 / 身份驗證
 - [x] 課程與單字內容管理
 - [x] 練習題與測驗（含批改邏輯）——目前為依課程單字自動出的選擇題測驗
-- [x] 使用者學習進度追蹤——目前為每次測驗的分數歷程，之後可再擴充（例如間隔重複）
+- [x] 使用者學習進度追蹤——每次測驗的分數歷程，以及每個單字的複習狀態（LEARNING / MASTERED）與複習次數
 - [x] 提供給前端 / App 的 REST API
 - [x] 角色 / 權限分級——`TEACHER` 管理課程與單字內容，`STUDENT` 唯讀並可測驗
 
@@ -31,10 +31,11 @@ src/
         controller/   # REST API 入口（HealthController、AuthController、CourseController、WordController、QuizController）
         config/       # 設定（SecurityConfig、OpenApiConfig）
         security/     # JwtService、JwtAuthFilter
-        service/      # 商業邏輯（AuthService、CourseService、WordService、QuizService）
-        repository/   # 資料存取層（UserRepository、CourseRepository、WordRepository、QuizAttemptRepository）
-        model/        # 實體類別 Entity（User、Role、Course、Word、QuizAttempt）
-        dto/          # 資料傳輸物件（Auth、Course、Word、Quiz 相關 DTO）
+        exception/    # GlobalExceptionHandler，統一錯誤回應格式
+        service/      # 商業邏輯（AuthService、CourseService、WordService、WordProgressService、QuizService）
+        repository/   # 資料存取層（UserRepository、CourseRepository、WordRepository、WordProgressRepository、QuizAttemptRepository）
+        model/        # 實體類別 Entity（User、Role、Course、Word、WordProgress、WordStatus、QuizAttempt）
+        dto/          # 資料傳輸物件（Auth、Course、Word、WordProgress、Quiz、ErrorResponse 相關 DTO）
     resources/
       application.properties
   test/
@@ -73,18 +74,22 @@ docker compose up -d
 | POST   | `/api/auth/login`             | 登入，成功回傳 `{ "token": ... }` | 否       | -        |
 | GET    | `/api/auth/me`                | 回傳目前登入使用者的 email 與角色 | 是       | 任一     |
 | POST   | `/api/courses`                | 新增課程                          | 是       | `TEACHER` |
-| GET    | `/api/courses`                | 取得課程列表                      | 是       | 任一     |
+| GET    | `/api/courses`                | 取得課程列表（分頁）              | 是       | 任一     |
 | GET    | `/api/courses/{id}`           | 取得單一課程                      | 是       | 任一     |
 | PUT    | `/api/courses/{id}`           | 更新課程                          | 是       | `TEACHER` |
-| DELETE | `/api/courses/{id}`           | 刪除課程                          | 是       | `TEACHER` |
+| DELETE | `/api/courses/{id}`           | 刪除課程（連同底下單字與其學習紀錄） | 是       | `TEACHER` |
 | POST   | `/api/courses/{courseId}/words` | 在指定課程下新增單字             | 是       | `TEACHER` |
-| GET    | `/api/courses/{courseId}/words` | 取得指定課程下的單字列表         | 是       | 任一     |
+| GET    | `/api/courses/{courseId}/words` | 取得指定課程下的單字列表（分頁） | 是       | 任一     |
 | GET    | `/api/words/{id}`             | 取得單一單字                      | 是       | 任一     |
 | PUT    | `/api/words/{id}`             | 更新單字                          | 是       | `TEACHER` |
-| DELETE | `/api/words/{id}`             | 刪除單字                          | 是       | `TEACHER` |
+| DELETE | `/api/words/{id}`             | 刪除單字（連同該單字的學習紀錄）  | 是       | `TEACHER` |
+| PUT    | `/api/words/{id}/progress`    | 標記單字複習狀態（LEARNING / MASTERED），複習次數會累加 | 是       | 任一     |
+| GET    | `/api/courses/{courseId}/word-progress` | 取得目前使用者在此課程下已標記過的單字學習狀態（分頁） | 是       | 任一     |
 | GET    | `/api/courses/{courseId}/quiz` | 依課程單字隨機出選擇題（`?size=`，預設 5，最少需課程內有 2 個單字） | 是       | 任一     |
 | POST   | `/api/courses/{courseId}/quiz/submit` | 提交作答並批改，回傳分數與每題對錯明細，同時記錄一筆測驗紀錄 | 是       | 任一     |
-| GET    | `/api/courses/{courseId}/progress` | 取得目前使用者在此課程的歷次測驗分數（新到舊）        | 是       | 任一     |
+| GET    | `/api/courses/{courseId}/progress` | 取得目前使用者在此課程的歷次測驗分數，新到舊（分頁）  | 是       | 任一     |
+
+標註「分頁」的清單端點支援 Spring Data 標準查詢參數：`?page=0&size=20&sort=欄位名,asc|desc`（皆可省略，預設 `page=0&size=20`），回傳格式為 Spring Data 的 `Page` 物件（內容在 `content` 欄位，另含 `totalElements`、`totalPages` 等分頁資訊）。
 
 註冊請求格式（`RegisterRequest`）：`{ "email": string (必填), "password": string (必填，至少 8 碼), "role": "TEACHER" | "STUDENT" (可省略，預設 STUDENT) }`
 
@@ -92,9 +97,13 @@ docker compose up -d
 
 單字請求格式（`WordRequest`）：`{ "term": string (必填), "meaning": string (必填), "example": string }`
 
+單字進度請求格式（`WordProgressRequest`）：`{ "status": "LEARNING" | "MASTERED" (必填) }`
+
 測驗作答格式（`QuizSubmissionRequest`）：`{ "answers": [{ "wordId": number, "selectedMeaning": string }] }`，`selectedMeaning` 需與出題時 `GET .../quiz` 回傳的選項之一相符（比對時忽略大小寫與前後空白）。
 
 呼叫需要 JWT 的端點時，帶上 `Authorization: Bearer <token>`。
+
+錯誤回應統一由 `GlobalExceptionHandler` 處理，格式為 `{ "timestamp", "status", "error", "message", "path" }`（`@Valid` 驗證失敗時 `message` 會列出各欄位的錯誤原因）。
 
 ```bash
 curl -X POST http://localhost:8080/api/auth/register \
