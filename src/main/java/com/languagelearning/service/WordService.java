@@ -5,22 +5,27 @@ import com.languagelearning.dto.WordResponse;
 import com.languagelearning.model.Course;
 import com.languagelearning.model.Word;
 import com.languagelearning.repository.CourseRepository;
+import com.languagelearning.repository.WordProgressRepository;
 import com.languagelearning.repository.WordRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-
-import java.util.List;
 
 @Service
 public class WordService {
 
     private final WordRepository wordRepository;
     private final CourseRepository courseRepository;
+    private final WordProgressRepository wordProgressRepository;
 
-    public WordService(WordRepository wordRepository, CourseRepository courseRepository) {
+    public WordService(WordRepository wordRepository, CourseRepository courseRepository,
+                        WordProgressRepository wordProgressRepository) {
         this.wordRepository = wordRepository;
         this.courseRepository = courseRepository;
+        this.wordProgressRepository = wordProgressRepository;
     }
 
     public WordResponse create(Long courseId, WordRequest request) {
@@ -30,11 +35,11 @@ public class WordService {
         return WordResponse.from(word);
     }
 
-    public List<WordResponse> listByCourse(Long courseId) {
+    public Page<WordResponse> listByCourse(Long courseId, Pageable pageable) {
         if (!courseRepository.existsById(courseId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found");
         }
-        return wordRepository.findByCourseId(courseId).stream().map(WordResponse::from).toList();
+        return wordRepository.findByCourseId(courseId, pageable).map(WordResponse::from);
     }
 
     public WordResponse get(Long id) {
@@ -49,8 +54,11 @@ public class WordService {
         return WordResponse.from(wordRepository.save(word));
     }
 
+    @Transactional
     public void delete(Long id) {
-        wordRepository.delete(findOrThrow(id));
+        Word word = findOrThrow(id);
+        wordProgressRepository.deleteByWordId(id);
+        wordRepository.delete(word);
     }
 
     private Word findOrThrow(Long id) {

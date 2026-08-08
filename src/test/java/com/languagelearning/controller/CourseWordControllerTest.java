@@ -69,7 +69,7 @@ class CourseWordControllerTest {
         // list words for the course
         mockMvc.perform(get("/api/courses/" + courseId + "/words").header("Authorization", token))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].term").value("hola"));
+            .andExpect(jsonPath("$.content[0].term").value("hola"));
 
         // update the word
         mockMvc.perform(put("/api/words/" + wordId)
@@ -80,7 +80,30 @@ class CourseWordControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.meaning").value("hi"));
 
-        // deleting the course cascades to its words
+        // mark the word as reviewed and check progress shows up
+        mockMvc.perform(put("/api/words/" + wordId + "/progress")
+                .header("Authorization", token)
+                .contentType("application/json")
+                .content("""
+                    {"status":"LEARNING"}"""))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.reviewCount").value(1))
+            .andExpect(jsonPath("$.status").value("LEARNING"));
+
+        mockMvc.perform(put("/api/words/" + wordId + "/progress")
+                .header("Authorization", token)
+                .contentType("application/json")
+                .content("""
+                    {"status":"MASTERED"}"""))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.reviewCount").value(2))
+            .andExpect(jsonPath("$.status").value("MASTERED"));
+
+        mockMvc.perform(get("/api/courses/" + courseId + "/word-progress").header("Authorization", token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content[0].status").value("MASTERED"));
+
+        // deleting the course cascades to its words (and their progress records)
         mockMvc.perform(delete("/api/courses/" + courseId).header("Authorization", token))
             .andExpect(status().isNoContent());
         mockMvc.perform(get("/api/words/" + wordId).header("Authorization", token))

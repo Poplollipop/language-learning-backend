@@ -14,6 +14,8 @@ import com.languagelearning.model.Word;
 import com.languagelearning.repository.CourseRepository;
 import com.languagelearning.repository.QuizAttemptRepository;
 import com.languagelearning.repository.WordRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -89,11 +91,10 @@ public class QuizService {
         return new QuizResultResponse(attempt.getId(), courseId, score, results.size(), results);
     }
 
-    public List<QuizAttemptSummaryResponse> history(Long courseId, User user) {
+    public Page<QuizAttemptSummaryResponse> history(Long courseId, User user, Pageable pageable) {
         findCourseOrThrow(courseId);
-        return quizAttemptRepository.findByUserIdAndCourseIdOrderByCreatedAtDesc(user.getId(), courseId).stream()
-            .map(QuizAttemptSummaryResponse::from)
-            .toList();
+        return quizAttemptRepository.findByUserIdAndCourseIdOrderByCreatedAtDesc(user.getId(), courseId, pageable)
+            .map(QuizAttemptSummaryResponse::from);
     }
 
     private List<String> buildOptions(Word correctWord, List<Word> allWords) {

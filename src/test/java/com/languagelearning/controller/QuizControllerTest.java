@@ -121,9 +121,9 @@ class QuizControllerTest {
         // progress history should now contain both attempts, most recent first
         mockMvc.perform(get("/api/courses/" + courseId + "/progress").header("Authorization", token))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.length()").value(2))
-            .andExpect(jsonPath("$[0].score").value(0))
-            .andExpect(jsonPath("$[1].score").value(2));
+            .andExpect(jsonPath("$.content.length()").value(2))
+            .andExpect(jsonPath("$.content[0].score").value(0))
+            .andExpect(jsonPath("$.content[1].score").value(2));
     }
 
     @Test

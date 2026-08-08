@@ -7,6 +7,8 @@ import com.languagelearning.dto.QuizSubmissionRequest;
 import com.languagelearning.model.User;
 import com.languagelearning.service.QuizService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,8 +16,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 @RestController
 public class QuizController {
@@ -40,8 +40,9 @@ public class QuizController {
     }
 
     @GetMapping("/api/courses/{courseId}/progress")
-    public List<QuizAttemptSummaryResponse> progress(@PathVariable Long courseId,
-                                                       @AuthenticationPrincipal User user) {
-        return quizService.history(courseId, user);
+    public Page<QuizAttemptSummaryResponse> progress(@PathVariable Long courseId,
+                                                       @AuthenticationPrincipal User user,
+                                                       Pageable pageable) {
+        return quizService.history(courseId, user, pageable);
     }
 }
